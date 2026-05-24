@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel</title>
+    <title>LiteOffice - Excel</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <style>
@@ -20,29 +20,14 @@
         .formula-bar { background: white; padding: 6px 12px; border-bottom: 1px solid #ccc; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .formula-label { background: #f0f0f0; padding: 4px 12px; border-radius: 4px; font-weight: bold; font-family: monospace; }
         #formulaInput { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 14px; }
-        .formula-preview {
-            background: #f9f9f9;
-            padding: 4px 12px;
-            font-size: 12px;
-            color: #666;
-            border-left: 2px solid #21a366;
-            font-family: monospace;
-        }
+        .formula-preview { background: #f9f9f9; padding: 4px 12px; font-size: 12px; color: #666; border-left: 2px solid #21a366; font-family: monospace; }
         .sheet-container { flex: 1; overflow: auto; background: white; }
         #excelGrid { border-collapse: collapse; width: 100%; }
         #excelGrid th, #excelGrid td { border: 1px solid #ccc; padding: 8px 10px; min-width: 90px; font-size: 13px; height: 36px; }
         #excelGrid th { background: #f1f3f5; position: sticky; top: 0; font-weight: 600; }
         #excelGrid td { background: white; cursor: pointer; }
-        #excelGrid td:focus {
-            background: #e8f5e9;
-            outline: 3px solid #21a366;
-            outline-offset: -1px;
-        }
-        #excelGrid td.selected {
-            background: #d4edda;
-            outline: 3px solid #21a366;
-            outline-offset: -1px;
-        }
+        #excelGrid td:focus { background: #e8f5e9; outline: 3px solid #21a366; outline-offset: -1px; }
+        #excelGrid td.selected { background: #d4edda; outline: 3px solid #21a366; outline-offset: -1px; }
         #excelGrid td.merged { background: #fff3e0; position: relative; }
         #excelGrid td.merged::after { content: "🔗"; position: absolute; bottom: 2px; right: 4px; font-size: 10px; opacity: 0.6; }
         .status { background: #f8f9fa; padding: 4px 12px; font-size: 12px; border-top: 1px solid #ddd; display: flex; gap: 20px; justify-content: space-between; }
@@ -72,7 +57,7 @@
 </head>
 <body>
 <div class="toolbar">
-    <span style="font-weight:bold;">📊 Excel</span>
+    <span style="font-weight:bold;">📊 LiteExcel</span>
     <button class="tool-btn" onclick="openFile()">📂 打开</button>
     <button class="tool-btn" onclick="saveFile()">💾 保存</button>
     <button class="tool-btn primary" onclick="openTemplate()">🎨 模板库</button>
@@ -88,7 +73,7 @@
     <div class="formula-preview" id="formulaPreview"></div>
 </div>
 <div class="sheet-container">
-    <table id="excelGrid"></td>
+    <table id="excelGrid"></tr>
 </div>
 <div class="sheet-tabs" id="sheetTabs">
 </div>
@@ -118,10 +103,10 @@
     let sheets = {};
     let sheetOrder = [];
     let activeSheet = '';
-    
+
     const DEFAULT_ROWS = 30;
     const DEFAULT_COLS = 12;
-    
+
     function createEmptySheet(name, rows = DEFAULT_ROWS, cols = DEFAULT_COLS) {
         let data = [];
         for(let i = 0; i < rows; i++) {
@@ -139,7 +124,7 @@
             selected: []
         };
     }
-    
+
     function initSheets() {
         let sheet1 = createEmptySheet('Sheet1');
         sheetOrder = ['Sheet1'];
@@ -149,10 +134,10 @@
         activeSheet = 'Sheet1';
     }
     initSheets();
-    
+
     let isCtrlPressed = false;
     let pendingBlur = null;
-    
+
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Control') {
             isCtrlPressed = true;
@@ -162,17 +147,17 @@
             }
         }
     });
-    
+
     document.addEventListener('keyup', (e) => {
         if (e.key === 'Control') {
             isCtrlPressed = false;
         }
     });
-    
+
     function getCurrentSheet() {
         return sheets[activeSheet];
     }
-    
+
     function colLetter(n) {
         let letter = '';
         while(n >= 0) {
@@ -181,7 +166,7 @@
         }
         return letter;
     }
-    
+
     function colToIndex(letters) {
         let idx = 0;
         for(let i = 0; i < letters.length; i++) {
@@ -189,7 +174,7 @@
         }
         return idx - 1;
     }
-    
+
     function getRawNumber(row, col) {
         let sheet = getCurrentSheet();
         for(let m of sheet.merges) {
@@ -205,11 +190,10 @@
         let n = parseFloat(v);
         return isNaN(n) ? 0 : n;
     }
-    
+
     function evalFormula(formula, row, col) {
         try {
             let expr = formula.substring(1).toUpperCase();
-            
             let sumPattern = /SUM\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)/g;
             expr = expr.replace(sumPattern, (match, c1, r1, c2, r2) => {
                 let cc1 = colToIndex(c1), cc2 = colToIndex(c2);
@@ -222,7 +206,6 @@
                 }
                 return total;
             });
-            
             let cellPattern = /([A-Z]+)(\d+)/g;
             expr = expr.replace(cellPattern, (match, letters, num) => {
                 let c = colToIndex(letters);
@@ -230,14 +213,13 @@
                 let val = getRawNumber(r, c);
                 return val;
             });
-            
             let result = Function('"use strict";return (' + expr + ')')();
             return isNaN(result) ? '#VALUE!' : Math.round(result * 100000) / 100000;
         } catch(e) {
             return '#ERROR!';
         }
     }
-    
+
     function getValue(row, col) {
         let sheet = getCurrentSheet();
         for(let m of sheet.merges) {
@@ -252,7 +234,7 @@
         }
         return v !== undefined ? v : '';
     }
-    
+
     function saveCell(row, col, value) {
         let sheet = getCurrentSheet();
         let merged = sheet.merges.find(m => row >= m.r1 && row <= m.r2 && col >= m.c1 && col <= m.c2);
@@ -263,12 +245,12 @@
         }
         render();
     }
-    
+
     function render() {
         let sheet = getCurrentSheet();
         let table = document.getElementById('excelGrid');
         table.innerHTML = '';
-        
+
         let thead = document.createElement('thead');
         let tr = document.createElement('tr');
         let th = document.createElement('th');
@@ -282,7 +264,7 @@
         }
         thead.appendChild(tr);
         table.appendChild(thead);
-        
+
         let tbody = document.createElement('tbody');
         for(let r = 0; r < sheet.rows; r++) {
             tr = document.createElement('tr');
@@ -290,12 +272,12 @@
             th.style.background = '#e9ecef';
             th.innerText = r + 1;
             tr.appendChild(th);
-            
+
             for(let c = 0; c < sheet.cols; c++) {
                 let td = document.createElement('td');
                 let isHidden = false;
                 let mergedInfo = null;
-                
+
                 for(let m of sheet.merges) {
                     if(r >= m.r1 && r <= m.r2 && c >= m.c1 && c <= m.c2) {
                         if(r !== m.r1 || c !== m.c1) {
@@ -306,7 +288,7 @@
                         break;
                     }
                 }
-                
+
                 if(mergedInfo) {
                     td.classList.add('merged');
                     if(mergedInfo.r2 > mergedInfo.r1) td.setAttribute('rowspan', mergedInfo.r2 - mergedInfo.r1 + 1);
@@ -320,19 +302,19 @@
                         td.innerText = val;
                     }
                 }
-                
+
                 if(isHidden) {
                     td.style.display = 'none';
                 }
-                
+
                 td.setAttribute('data-row', r);
                 td.setAttribute('data-col', c);
                 td.setAttribute('contenteditable', 'true');
-                
+
                 if(sheet.selected.some(s => s.row === r && s.col === c)) {
                     td.classList.add('selected');
                 }
-                
+
                 td.onfocus = (function(row, col) {
                     return function() {
                         if (pendingBlur) {
@@ -345,7 +327,7 @@
                         document.getElementById('formulaPreview').innerHTML = '📊 结果: ' + result;
                     };
                 })(r, c);
-                
+
                 td.onblur = (function(row, col) {
                     return function(e) {
                         if (isCtrlPressed) {
@@ -364,7 +346,7 @@
                         render();
                     };
                 })(r, c);
-                
+
                 td.onclick = (function(row, col) {
                     return function(e) {
                         let sheet = getCurrentSheet();
@@ -372,7 +354,7 @@
                             clearTimeout(pendingBlur);
                             pendingBlur = null;
                         }
-                        
+
                         if(e.ctrlKey) {
                             e.preventDefault();
                             let idx = sheet.selected.findIndex(s => s.row === row && s.col === col);
@@ -411,7 +393,7 @@
                         e.stopPropagation();
                     };
                 })(r, c);
-                
+
                 tr.appendChild(td);
             }
             tbody.appendChild(tr);
@@ -420,7 +402,7 @@
         updateInfo();
         renderSheetTabs();
     }
-    
+
     function updateInfo() {
         let sheet = getCurrentSheet();
         let info = document.getElementById('selectionInfo');
@@ -430,39 +412,39 @@
             info.innerHTML = '⚡ Ctrl多选单元格后合并';
         }
     }
-    
+
     function mergeSelected() {
         let sheet = getCurrentSheet();
         if(sheet.selected.length < 2) {
             alert('请按住Ctrl键选择至少2个单元格');
             return;
         }
-        
+
         let rows = sheet.selected.map(s => s.row);
         let cols = sheet.selected.map(s => s.col);
         let r1 = Math.min(...rows);
         let r2 = Math.max(...rows);
         let c1 = Math.min(...cols);
         let c2 = Math.max(...cols);
-        
+
         let expected = (r2 - r1 + 1) * (c2 - c1 + 1);
         if(sheet.selected.length !== expected) {
             alert('请选择连续的矩形区域');
             return;
         }
-        
+
         let topLeft = getValue(r1, c1);
-        
+
         sheet.merges = sheet.merges.filter(m => {
             return !(m.r1 >= r1 && m.r2 <= r2 && m.c1 >= c1 && m.c2 <= c2);
         });
-        
+
         sheet.merges.push({
             r1: r1, c1: c1,
             r2: r2, c2: c2,
             value: topLeft
         });
-        
+
         for(let r = r1; r <= r2; r++) {
             for(let c = c1; c <= c2; c++) {
                 if(r !== r1 || c !== c1) {
@@ -470,12 +452,12 @@
                 }
             }
         }
-        
+
         sheet.selected = [{row: r1, col: c1}];
         render();
         alert('合并成功！');
     }
-    
+
     function applyFormula() {
         let formula = document.getElementById('formulaInput').value;
         let sheet = getCurrentSheet();
@@ -494,7 +476,7 @@
         document.getElementById('formulaInput').value = '';
         document.getElementById('formulaPreview').innerHTML = '';
     }
-    
+
     function loadTemplate(type) {
         let sheet = getCurrentSheet();
         if(type === 'blank') {
@@ -527,7 +509,7 @@
         render();
         closeModal();
     }
-    
+
     function addSheet() {
         let newName = `Sheet${sheetOrder.length + 1}`;
         let counter = 2;
@@ -540,12 +522,12 @@
         renderSheetTabs();
         render();
     }
-    
+
     function switchSheet(sheetName) {
         activeSheet = sheetName;
         render();
     }
-    
+
     function deleteSheet(sheetName, event) {
         event.stopPropagation();
         if(sheetOrder.length === 1) {
@@ -563,7 +545,7 @@
             render();
         }
     }
-    
+
     function renderSheetTabs() {
         let container = document.getElementById('sheetTabs');
         container.innerHTML = '';
@@ -581,10 +563,10 @@
         addBtn.onclick = () => addSheet();
         container.appendChild(addBtn);
     }
-    
+
     function openTemplate() { document.getElementById('templateModal').style.display = 'flex'; }
     function closeModal() { document.getElementById('templateModal').style.display = 'none'; }
-    
+
     function openFile() {
         let input = document.createElement('input');
         input.type = 'file';
@@ -595,10 +577,10 @@
             reader.onload = function(ev) {
                 let dataArr = new Uint8Array(ev.target.result);
                 let workbook = XLSX.read(dataArr, {type: 'array'});
-                
+
                 sheets = {};
                 sheetOrder = [];
-                
+
                 for(let sheetName of workbook.SheetNames) {
                     let sheet = workbook.Sheets[sheetName];
                     let json = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ''});
@@ -608,7 +590,7 @@
                         cols = Math.max(cols, row.length);
                     }
                     cols = Math.max(cols, DEFAULT_COLS);
-                    
+
                     let newSheet = createEmptySheet(sheetName, rows, cols);
                     for(let i = 0; i < json.length; i++) {
                         for(let j = 0; j < json[i].length; j++) {
@@ -620,7 +602,7 @@
                     sheets[sheetName] = newSheet;
                     sheetOrder.push(sheetName);
                 }
-                
+
                 if(sheetOrder.length === 0) {
                     initSheets();
                 }
@@ -631,29 +613,53 @@
         };
         input.click();
     }
-    
+
     function saveFile() {
-        let workbook = XLSX.utils.book_new();
+        let sheet = getCurrentSheet();
+        let sheetName = activeSheet;
+
         let sheetData = [];
-        for(let r = 0; r < sheetRows; r++) {
+        for(let r = 0; r < sheet.rows; r++) {
             let row = [];
-            for(let c = 0; c < sheetCols; c++) {
-                row.push(getCellValue(r, c));
+            for(let c = 0; c < sheet.cols; c++) {
+                let isMergedSub = false;
+                for(let m of sheet.merges) {
+                    if(r >= m.r1 && r <= m.r2 && c >= m.c1 && c <= m.c2) {
+                        if(r !== m.r1 || c !== m.c1) {
+                            isMergedSub = true;
+                        }
+                        break;
+                    }
+                }
+                if(isMergedSub) {
+                    row.push('');
+                } else {
+                    let val = sheet.data[r][c];
+                    if(typeof val === 'string' && val.startsWith('=')) {
+                        row.push(evalFormula(val, r, c));
+                    } else {
+                        row.push(val);
+                    }
+                }
             }
             sheetData.push(row);
         }
+
         let ws = XLSX.utils.aoa_to_sheet(sheetData);
-        XLSX.utils.book_append_sheet(workbook, ws, 'Sheet1');
-        XLSX.writeFile(workbook, `${currentFileName}.xlsx`);
+        let workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+
+        let title = "表格";
+        XLSX.writeFile(workbook, `${title}.xlsx`);
     }
-    
+
     function addRow() {
         let sheet = getCurrentSheet();
         sheet.data.push(Array(sheet.cols).fill(''));
         sheet.rows++;
         render();
     }
-    
+
     function addCol() {
         let sheet = getCurrentSheet();
         for(let r = 0; r < sheet.data.length; r++) {
@@ -662,7 +668,7 @@
         sheet.cols++;
         render();
     }
-    
+
     function clearAll() {
         if(confirm('清空当前表格所有数据？')) {
             let sheet = getCurrentSheet();
@@ -675,7 +681,7 @@
             render();
         }
     }
-    
+
     document.getElementById('formulaInput').addEventListener('input', function() {
         let formula = this.value;
         let preview = document.getElementById('formulaPreview');
@@ -693,7 +699,7 @@
             preview.innerHTML = '';
         }
     });
-    
+
     renderSheetTabs();
     render();
 </script>
