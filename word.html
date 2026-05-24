@@ -144,7 +144,44 @@
     
     function openDOCX() { let input=document.createElement('input'); input.type='file'; input.accept='.docx'; input.onchange=function(e){ let file=e.target.files[0]; let reader=new FileReader(); reader.onload=function(ev){ mammoth.convertToHtml({arrayBuffer:ev.target.result}).then(function(result){ document.getElementById('editorContent').innerHTML=result.value; document.getElementById('docTitle').value=file.name.replace(/\.docx$/i,''); hasUnsavedChanges=false; document.getElementById('saveStatus').innerHTML='✓ 已保存'; document.getElementById('saveStatus').classList.remove('unsaved'); updateWordCount(); }); }; reader.readAsArrayBuffer(file); }; input.click(); }
     
-    function saveAsDOCX() { let title=document.getElementById('docTitle').value||'文档'; let content=document.getElementById('editorContent').innerHTML; let fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:'Microsoft YaHei';padding:40px;line-height:1.6} table{border-collapse:collapse;width:100%} th,td{border:1px solid #ddd;padding:8px}</style></head><body>${content}</body></html>`; let converted=htmlDocx.asBlob(fullHtml,{orientation:'portrait'}); saveAs(converted,`${title}.docx`); hasUnsavedChanges=false; document.getElementById('saveStatus').innerHTML='✓ 已保存'; document.getElementById('saveStatus').classList.remove('unsaved'); }
+    function saveAsDOCX() {
+    let title = document.getElementById('docTitle').value.trim();
+    if (!title) title = "未命名文档";
+    
+    let content = document.getElementById('editorContent').innerHTML;
+    
+    let fullHtml = `<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>${title}</title>
+        <style>
+            body {
+                font-family: 'Microsoft YaHei', '宋体', Arial, sans-serif;
+                padding: 40px;
+                line-height: 1.6;
+                font-size: 12pt;
+            }
+            h1 { font-size: 24pt; margin: 20px 0 10px; }
+            h2 { font-size: 18pt; margin: 15px 0 8px; color: #2c3e50; }
+            p { margin: 10px 0; }
+            ul, ol { margin: 10px 0 10px 25px; }
+            table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f8f9fa; }
+        </style>
+    </head>
+    <body>
+        ${content}
+    </body>
+    </html>`;
+    
+    let blob = htmlDocx.asBlob(fullHtml, { orientation: 'portrait' });
+    saveAs(blob, `${title}.docx`);
+    hasUnsavedChanges = false;
+    document.getElementById('saveStatus').innerHTML = '✓ 已保存';
+    document.getElementById('saveStatus').classList.remove('unsaved');
+}
     
     document.getElementById('editorContent').addEventListener('input', markUnsaved);
     document.addEventListener('keydown',e=>{ if(e.ctrlKey&&e.key==='s'){ e.preventDefault(); saveAsDOCX(); } if(e.ctrlKey&&e.key==='n'){ e.preventDefault(); newDocument(); } });
