@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Word</title>
+    <title>LiteOffice - Word</title>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mammoth@1.4.2/mammoth.browser.min.js"></script>
@@ -58,8 +58,8 @@
 <div class="word-editor">
     <div class="title-bar">
         <div class="title-left">
-            <div class="logo">📝 Word</div>
-            <input type="text" class="document-title" id="docTitle" value="新文档">
+            <div class="logo">📝 LiteWord</div>
+            <input type="text" class="document-title" id="docTitle" value="未命名文档">
         </div>
         <div class="save-status" id="saveStatus">✓ 已保存</div>
     </div>
@@ -94,31 +94,27 @@
 
 <script>
     let hasUnsavedChanges = false;
-    
+
     function updateWordCount() {
         let editor = document.getElementById('editorContent');
         let text = editor.innerText || editor.textContent || '';
-        
         let chineseCount = (text.match(/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/g) || []).length;
-        
         let englishText = text.replace(/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/g, ' ');
         let englishWords = englishText.match(/[a-zA-Z0-9]+/g) || [];
         let englishCount = englishWords.length;
-        
         let total = chineseCount + englishCount;
-        
         document.getElementById('wordCount').innerText = total;
     }
-    
+
     function formatText(cmd, val) { document.execCommand(cmd, false, val || null); markUnsaved(); updateWordCount(); }
-    function insertTable() { let r=prompt('行数:','3'), c=prompt('列数:','3'); if(r&&c){ let html='<table border="1" style="border-collapse:collapse;width:100%">'; for(let i=0;i<r;i++){ html+='<tr>'; for(let j=0;j<c;j++) html+='<td style="padding:5px">&nbsp;</td>'; html+='</tr>'; } html+='</table>'; document.execCommand('insertHTML',false,html); markUnsaved(); updateWordCount(); } }
+    function insertTable() { let r=prompt('行数:','3'), c=prompt('列数:','3'); if(r&&c){ let html='<table>'; for(let i=0;i<r;i++){ html+='<tr>'; for(let j=0;j<c;j++) html+='<td style="padding:5px">&nbsp;<\/td>'; html+='<\/tr>'; } html+='<\/table>'; document.execCommand('insertHTML',false,html); markUnsaved(); updateWordCount(); } }
     function insertImage() { let url=prompt('图片URL:','https://picsum.photos/400/200'); if(url) document.execCommand('insertHTML',false,`<img src="${url}" style="max-width:100%;margin:10px 0">`); markUnsaved(); updateWordCount(); }
     function insertList() { document.execCommand('insertUnorderedList'); markUnsaved(); updateWordCount(); }
-    
+
     function markUnsaved() { if(!hasUnsavedChanges){ hasUnsavedChanges=true; document.getElementById('saveStatus').innerHTML='⚠ 未保存'; document.getElementById('saveStatus').classList.add('unsaved'); } updateWordCount(); }
-    
-    function newDocument() { if(hasUnsavedChanges && !confirm('有未保存内容，确定新建？')) return; document.getElementById('docTitle').value='新文档'; document.getElementById('editorContent').innerHTML=''; hasUnsavedChanges=false; document.getElementById('saveStatus').innerHTML='✓ 已保存'; document.getElementById('saveStatus').classList.remove('unsaved'); updateWordCount(); }
-    
+
+    function newDocument() { if(hasUnsavedChanges && !confirm('有未保存内容，确定新建？')) return; document.getElementById('docTitle').value='未命名文档'; document.getElementById('editorContent').innerHTML=''; hasUnsavedChanges=false; document.getElementById('saveStatus').innerHTML='✓ 已保存'; document.getElementById('saveStatus').classList.remove('unsaved'); updateWordCount(); }
+
     function applyTemplate(type) {
         let templates = {
             blank: '',
@@ -131,61 +127,53 @@
         let content = templates[type] || '';
         if(hasUnsavedChanges && !confirm('有未保存内容，应用模板将覆盖当前内容，确定？')) return;
         document.getElementById('editorContent').innerHTML = content;
-        document.getElementById('docTitle').value = {blank:'新文档',resume:'简历',report:'工作报告',letter:'商务信函',essay:'学术论文',meeting:'会议纪要'}[type] || '新文档';
+        document.getElementById('docTitle').value = {blank:'未命名文档',resume:'简历',report:'工作报告',letter:'商务信函',essay:'学术论文',meeting:'会议纪要'}[type] || '未命名文档';
         hasUnsavedChanges = false;
         document.getElementById('saveStatus').innerHTML='✓ 已保存';
         document.getElementById('saveStatus').classList.remove('unsaved');
         updateWordCount();
         closeTemplateModal();
     }
-    
+
     function openTemplateModal() { document.getElementById('templateModal').style.display = 'flex'; }
     function closeTemplateModal() { document.getElementById('templateModal').style.display = 'none'; }
-    
+
     function openDOCX() { let input=document.createElement('input'); input.type='file'; input.accept='.docx'; input.onchange=function(e){ let file=e.target.files[0]; let reader=new FileReader(); reader.onload=function(ev){ mammoth.convertToHtml({arrayBuffer:ev.target.result}).then(function(result){ document.getElementById('editorContent').innerHTML=result.value; document.getElementById('docTitle').value=file.name.replace(/\.docx$/i,''); hasUnsavedChanges=false; document.getElementById('saveStatus').innerHTML='✓ 已保存'; document.getElementById('saveStatus').classList.remove('unsaved'); updateWordCount(); }); }; reader.readAsArrayBuffer(file); }; input.click(); }
-    
+
     function saveAsDOCX() {
-    let title = document.getElementById('docTitle').value.trim();
-    if (!title) title = "未命名文档";
-    
-    let content = document.getElementById('editorContent').innerHTML;
-    
-    let fullHtml = `<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>${title}</title>
-        <style>
-            body {
-                font-family: 'Microsoft YaHei', '宋体', Arial, sans-serif;
-                padding: 40px;
-                line-height: 1.6;
-                font-size: 12pt;
-            }
-            h1 { font-size: 24pt; margin: 20px 0 10px; }
-            h2 { font-size: 18pt; margin: 15px 0 8px; color: #2c3e50; }
-            p { margin: 10px 0; }
-            ul, ol { margin: 10px 0 10px 25px; }
-            table { border-collapse: collapse; width: 100%; margin: 15px 0; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background: #f8f9fa; }
-        </style>
-    </head>
-    <body>
-        ${content}
-    </body>
-    </html>`;
-    
-    let blob = htmlDocx.asBlob(fullHtml, { orientation: 'portrait' });
-    saveAs(blob, `${title}.docx`);
-    hasUnsavedChanges = false;
-    document.getElementById('saveStatus').innerHTML = '✓ 已保存';
-    document.getElementById('saveStatus').classList.remove('unsaved');
-}
-    
+        let title = document.getElementById('docTitle').value.trim();
+        if (!title) title = "未命名文档";
+        let content = document.getElementById('editorContent').innerHTML;
+        let fullHtml = `<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>${title}</title>
+            <style>
+                body { font-family: 'Microsoft YaHei', '宋体', Arial, sans-serif; padding: 40px; line-height: 1.6; font-size: 12pt; }
+                h1 { font-size: 24pt; margin: 20px 0 10px; }
+                h2 { font-size: 18pt; margin: 15px 0 8px; color: #2c3e50; }
+                p { margin: 10px 0; }
+                ul, ol { margin: 10px 0 10px 25px; }
+                table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background: #f8f9fa; }
+            </style>
+        </head>
+        <body>
+            ${content}
+        </body>
+        </html>`;
+        let blob = htmlDocx.asBlob(fullHtml, { orientation: 'portrait' });
+        saveAs(blob, `${title}.docx`);
+        hasUnsavedChanges = false;
+        document.getElementById('saveStatus').innerHTML = '✓ 已保存';
+        document.getElementById('saveStatus').classList.remove('unsaved');
+    }
+
     document.getElementById('editorContent').addEventListener('input', markUnsaved);
     document.addEventListener('keydown',e=>{ if(e.ctrlKey&&e.key==='s'){ e.preventDefault(); saveAsDOCX(); } if(e.ctrlKey&&e.key==='n'){ e.preventDefault(); newDocument(); } });
-    
+
     updateWordCount();
 </script>
 </body>
