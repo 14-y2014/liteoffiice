@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Point</title>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { display: flex; flex-direction: column; height: 100vh; background: #2b2b2b; font-family: 'Microsoft YaHei', sans-serif; }
+        .toolbar { background: #c43e1c; color: white; padding: 8px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .tool-btn { background: #d94c2a; border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .tool-btn.primary { background: #b13212; }
+        .tool-btn:hover { filter: brightness(0.9); }
+        select { padding: 5px 8px; border-radius: 4px; background: #d94c2a; color: white; border: none; cursor: pointer; font-size: 12px; }
+        .main { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 180px; background: #3c3f41; color: white; display: flex; flex-direction: column; padding: 8px; gap: 8px; overflow-y: auto; }
+        .slide-thumb { background: #2b2b2b; border: 2px solid #5a5e62; border-radius: 6px; padding: 8px; cursor: pointer; text-align: center; margin-bottom: 6px; transition: 0.2s; font-size: 11px; }
+        .slide-thumb.active { border-color: #c43e1c; background: #4a4e52; }
+        .slide-thumb:hover { background: #5a5e62; }
+        .preview-area { flex: 1; background: #e9ecef; display: flex; justify-content: center; align-items: center; padding: 20px; overflow: auto; }
+        .slide-canvas { background: white; width: 900px; min-height: 540px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; overflow: auto; cursor: default; }
+        .slide-element { position: absolute; cursor: move; border: 1px dashed transparent; padding: 8px; min-width: 40px; user-select: none; }
+        .slide-element:hover { border-color: #c43e1c; background: rgba(196,62,28,0.05); }
+        .slide-element.selected { border: 2px solid #c43e1c; background: rgba(196,62,28,0.1); }
+        .slide-element.shape { display: flex; align-items: center; justify-content: center; }
+        .slide-element.shape.rect { background: #c43e1c; }
+        .slide-element.shape.circle { background: #c43e1c; border-radius: 50%; }
+        .slide-element.shape.triangle { width: 0 !important; background: transparent; }
+        .slide-element.shape.diamond { background: #c43e1c; transform: rotate(45deg); }
+        .slide-element.shape.star { background: transparent; color: #f5b042; font-size: 50px; text-align: center; line-height: 1; }
+        .slide-element.shape.heart { background: transparent; color: #e34234; font-size: 50px; text-align: center; line-height: 1; }
+        .slide-element.shape.arrow { background: transparent; color: #c43e1c; font-size: 50px; text-align: center; line-height: 1; }
+        .status-bar { background: #1e1e1e; color: #aaa; padding: 4px 12px; font-size: 12px; display: flex; justify-content: space-between; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; border-radius: 8px; width: 500px; max-width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-header { background: #c43e1c; color: white; padding: 12px 15px; border-radius: 8px 8px 0 0; }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 12px 15px; background: #f8f9fa; text-align: right; border-top: 1px solid #dee2e6; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #c43e1c; color: white; }
+        .btn-secondary { background: #6c757d; color: white; margin-right: 8px; }
+        .template-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .template-card { padding: 15px; background: #f8f9fa; border-radius: 8px; cursor: pointer; text-align: center; transition: 0.2s; }
+        .template-card:hover { background: #e9ecef; transform: translateY(-2px); }
+        .template-icon { font-size: 40px; margin-bottom: 10px; }
+        @media (max-width: 700px) { .slide-canvas { width: 100%; transform: scale(0.8); } .tool-btn { font-size: 10px; padding: 4px 8px; } }
+    </style>
+</head>
+<body>
+<div class="toolbar">
+    <span style="font-weight:bold;">📽️ Power Point</span>
+    <button class="tool-btn" onclick="addSlide()">➕ 新增</button>
+    <button class="tool-btn" onclick="deleteSlide()">🗑️ 删除</button>
+    <button class="tool-btn" onclick="addTextBox()">📝 文本框</button>
+    <button class="tool-btn primary" onclick="openTemplateModal()">🎨 模板库</button>
+    <span style="font-size:11px;">| 图形:</span>
+    <button class="tool-btn" onclick="addShape('rect')">📦 矩形</button>
+    <button class="tool-btn" onclick="addShape('circle')">⚪ 圆形</button>
+    <button class="tool-btn" onclick="addShape('triangle')">🔺 三角</button>
+    <button class="tool-btn" onclick="addShape('diamond')">🔷 菱形</button>
+    <button class="tool-btn" onclick="addShape('star')">⭐ 星形</button>
+    <button class="tool-btn" onclick="addShape('heart')">❤️ 心形</button>
+    <button class="tool-btn" onclick="addShape('arrow')">➡️ 箭头</button>
+    <select id="fontFamily" onchange="changeFont(this.value)"><option value="Microsoft YaHei">微软雅黑</option><option value="SimSun">宋体</option><option value="SimHei">黑体</option><option value="KaiTi">楷体</option></select>
+    <button class="tool-btn" onclick="boldText()"><b>B</b></button>
+    <input type="color" id="textColor" onchange="changeTextColor(this.value)" value="#000000">
+    <button class="tool-btn" onclick="saveAsPPTX()">💾 保存</button>
+    <button class="tool-btn" onclick="fullscreenPlay()">▶ 演示</button>
+</div>
+<div class="main">
+    <div class="sidebar" id="slideList"></div>
+    <div class="preview-area"><div class="slide-canvas" id="currentSlide"></div></div>
+</div>
+<div class="status-bar"><span>大纲 模式</span><span id="pageInfo">1 / 1</span></div>
+
+<div class="modal" id="templateModal">
+    <div class="modal-content">
+        <div class="modal-header"><h3>🎨 选择模板</h3></div>
+        <div class="modal-body">
+            <div class="template-grid">
+                <div class="template-card" onclick="applyTemplate('blank')"><div class="template-icon">📄</div><div>空白幻灯片</div></div>
+                <div class="template-card" onclick="applyTemplate('title')"><div class="template-icon">🏆</div><div>标题封面</div></div>
+                <div class="template-card" onclick="applyTemplate('bullets')"><div class="template-icon">📋</div><div>项目列表</div></div>
+                <div class="template-card" onclick="applyTemplate('twoCol')"><div class="template-icon">📊</div><div>双栏对比</div></div>
+                <div class="template-card" onclick="applyTemplate('quote')"><div class="template-icon">💬</div><div>引用格言</div></div>
+                <div class="template-card" onclick="applyTemplate('thanks')"><div class="template-icon">🙏</div><div>致谢页</div></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeTemplateModal()">关闭</button></div>
+    </div>
+</div>
+
+<script>
+    let slides = [];
+    let currentIndex = 0;
+    let selectedElement = null;
+    let selectedElementIdx = -1;
+    let dragStartX = 0, dragStartY = 0;
+    let isDragging = false;
+    
+    function initDefault() {
+        slides = [{ elements: [] }];
+    }
+    
+    function renderSidebar() {
+        let container = document.getElementById('slideList');
+        container.innerHTML = '';
+        slides.forEach((slide, idx) => {
+            let div = document.createElement('div');
+            div.className = 'slide-thumb' + (idx === currentIndex ? ' active' : '');
+            div.innerHTML = `<div style="font-size:12px;">📄 幻灯片 ${idx+1}</div><div style="font-size:10px;">${slide.elements.length} 个元素</div>`;
+            div.onclick = () => { 
+                currentIndex = idx; 
+                selectedElement = null;
+                selectedElementIdx = -1;
+                renderSlide(); 
+                renderSidebar(); 
+            };
+            container.appendChild(div);
+        });
+        document.getElementById('pageInfo').innerText = `${currentIndex+1} / ${slides.length}`;
+    }
+    
+    function renderSlide() {
+        let canvas = document.getElementById('currentSlide');
+        canvas.innerHTML = '';
+        canvas.style.position = 'relative';
+        canvas.style.minHeight = '540px';
+        canvas.style.cursor = 'default';
+        
+        slides[currentIndex].elements.forEach((el, idx) => {
+            let div = document.createElement('div');
+            div.className = 'slide-element';
+            if (el.type === 'shape') div.classList.add('shape', el.shapeType);
+            div.setAttribute('data-idx', idx);
+            div.style.position = 'absolute';
+            div.style.left = el.x + 'px';
+            div.style.top = el.y + 'px';
+            div.style.cursor = 'move';
+            
+            if (el.type === 'text') {
+                div.style.width = el.width + 'px';
+                div.innerHTML = el.content;
+                div.style.fontSize = el.fontSize + 'px';
+                div.style.fontFamily = el.fontFamily;
+                div.style.color = el.color;
+                div.setAttribute('contenteditable', 'true');
+                div.addEventListener('input', (e) => {
+                    updateElementContent(idx, div.innerHTML);
+                    e.stopPropagation();
+                });
+            } 
+            else if (el.type === 'shape') {
+                div.style.width = el.width + 'px';
+                div.style.height = el.height + 'px';
+                
+                if (el.shapeType === 'triangle') {
+                    div.style.width = '0';
+                    div.style.height = '0';
+                    div.style.borderLeft = (el.width/2) + 'px solid transparent';
+                    div.style.borderRight = (el.width/2) + 'px solid transparent';
+                    div.style.borderBottom = el.height + 'px solid ' + (el.color || '#c43e1c');
+                    div.style.background = 'transparent';
+                }
+                else if (el.shapeType === 'diamond') {
+                    div.style.background = el.color || '#c43e1c';
+                    div.style.transform = 'rotate(45deg)';
+                }
+                else if (el.shapeType === 'star') {
+                    div.style.background = 'transparent';
+                    div.style.color = el.color || '#f5b042';
+                    div.style.fontSize = (Math.min(el.width, el.height) * 0.6) + 'px';
+                    div.innerHTML = '★';
+                }
+                else if (el.shapeType === 'heart') {
+                    div.style.background = 'transparent';
+                    div.style.color = el.color || '#e34234';
+                    div.style.fontSize = (Math.min(el.width, el.height) * 0.6) + 'px';
+                    div.innerHTML = '❤️';
+                }
+                else if (el.shapeType === 'arrow') {
+                    div.style.background = 'transparent';
+                    div.style.color = el.color || '#c43e1c';
+                    div.style.fontSize = (Math.min(el.width, el.height) * 0.6) + 'px';
+                    div.innerHTML = '➡️';
+                }
+                else {
+                    div.style.background = el.color || '#c43e1c';
+                    if (el.shapeType === 'circle') div.style.borderRadius = '50%';
+                }
+                
+                if (el.shapeType !== 'triangle') {
+                    div.style.display = 'flex';
+                    div.style.alignItems = 'center';
+                    div.style.justifyContent = 'center';
+                }
+            }
+            
+            if (selectedElementIdx === idx) {
+                div.classList.add('selected');
+            }
+            
+            div.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                selectElement(div, idx);
+                startDrag(e, idx);
+            });
+            
+            div.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectElement(div, idx);
+            });
+            
+            canvas.appendChild(div);
+        });
+        
+        canvas.addEventListener('click', (e) => {
+            if (e.target === canvas) {
+                clearSelection();
+            }
+        });
+    }
+    
+    function clearSelection() {
+        if (selectedElement) {
+            selectedElement.classList.remove('selected');
+            selectedElement = null;
+            selectedElementIdx = -1;
+        }
+    }
+    
+    function selectElement(el, idx) {
+        if (selectedElement) {
+            selectedElement.classList.remove('selected');
+        }
+        selectedElement = el;
+        selectedElementIdx = idx;
+        selectedElement.classList.add('selected');
+    }
+    
+    function startDrag(e, idx) {
+        e.preventDefault();
+        let targetEl = selectedElement;
+        if (!targetEl || parseInt(targetEl.getAttribute('data-idx')) !== idx) {
+            return;
+        }
+        
+        isDragging = true;
+        let startLeft = parseInt(targetEl.style.left);
+        let startTop = parseInt(targetEl.style.top);
+        let startMouseX = e.clientX;
+        let startMouseY = e.clientY;
+        
+        function onMouseMove(moveEvent) {
+            if (!isDragging) return;
+            moveEvent.preventDefault();
+            let dx = moveEvent.clientX - startMouseX;
+            let dy = moveEvent.clientY - startMouseY;
+            let newLeft = startLeft + dx;
+            let newTop = startTop + dy;
+            newLeft = Math.max(0, Math.min(newLeft, 800));
+            newTop = Math.max(0, Math.min(newTop, 440));
+            targetEl.style.left = newLeft + 'px';
+            targetEl.style.top = newTop + 'px';
+            slides[currentIndex].elements[idx].x = newLeft;
+            slides[currentIndex].elements[idx].y = newTop;
+        }
+        
+        function onMouseUp() {
+            isDragging = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        }
+        
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    }
+    
+    function updateElementContent(idx, content) {
+        slides[currentIndex].elements[idx].content = content;
+    }
+    
+    function addTextBox() {
+        let newEl = { 
+            type: 'text', 
+            x: 100, 
+            y: 100, 
+            width: 200, 
+            content: '新文本框', 
+            fontSize: 18, 
+            fontFamily: 'Microsoft YaHei', 
+            color: '#000000' 
+        };
+        slides[currentIndex].elements.push(newEl);
+        selectedElement = null;
+        selectedElementIdx = -1;
+        renderSlide(); 
+        renderSidebar();
+    }
+    
+    function addShape(shapeType) {
+        let config = {
+            rect: { width: 100, height: 80, color: '#c43e1c', content: '' },
+            circle: { width: 80, height: 80, color: '#c43e1c', content: '' },
+            triangle: { width: 80, height: 70, color: '#c43e1c', content: '' },
+            diamond: { width: 80, height: 80, color: '#c43e1c', content: '' },
+            star: { width: 80, height: 80, color: '#f5b042', content: '★' },
+            heart: { width: 80, height: 80, color: '#e34234', content: '❤️' },
+            arrow: { width: 80, height: 80, color: '#c43e1c', content: '➡️' }
+        };
+        let cfg = config[shapeType];
+        let newEl = {
+            type: 'shape',
+            shapeType: shapeType,
+            x: 100 + Math.random() * 200,
+            y: 100 + Math.random() * 200,
+            width: cfg.width,
+            height: cfg.height,
+            color: cfg.color,
+            content: cfg.content || ''
+        };
+        slides[currentIndex].elements.push(newEl);
+        selectedElement = null;
+        selectedElementIdx = -1;
+        renderSlide();
+        renderSidebar();
+    }
+    
+    function changeFont(font) {
+        if (selectedElement && selectedElementIdx >= 0) {
+            let el = slides[currentIndex].elements[selectedElementIdx];
+            if (el.type === 'text') {
+                el.fontFamily = font;
+                renderSlide();
+            }
+        }
+    }
+    
+    function changeTextColor(color) {
+        if (selectedElement && selectedElementIdx >= 0) {
+            let el = slides[currentIndex].elements[selectedElementIdx];
+            if (el.type === 'text') {
+                el.color = color;
+                renderSlide();
+            } else if (el.type === 'shape') {
+                el.color = color;
+                renderSlide();
+            }
+        }
+    }
+    
+    function boldText() {
+        if (selectedElement && selectedElementIdx >= 0) {
+            let el = slides[currentIndex].elements[selectedElementIdx];
+            if (el.type === 'text') {
+                document.execCommand('bold');
+            }
+        }
+    }
+    
+    function addSlide() { 
+        slides.push({ elements: [] }); 
+        currentIndex = slides.length - 1;
+        selectedElement = null;
+        selectedElementIdx = -1;
+        renderSlide(); 
+        renderSidebar(); 
+    }
+    
+    function deleteSlide() { 
+        if (slides.length <= 1) { 
+            alert('至少保留一页'); 
+            return; 
+        } 
+        slides.splice(currentIndex, 1); 
+        if (currentIndex >= slides.length) currentIndex = slides.length - 1;
+        selectedElement = null;
+        selectedElementIdx = -1;
+        renderSlide(); 
+        renderSidebar(); 
+    }
+    
+    function applyTemplate(type) {
+        let templates = {
+            blank: [],
+            title: [{ type: 'text', x: 150, y: 200, width: 600, content: '<h1 style="text-align:center;">演示文稿标题</h1>', fontSize: 44, fontFamily: 'Microsoft YaHei', color: '#c43e1c' }, 
+                      { type: 'text', x: 150, y: 300, width: 600, content: '<p style="text-align:center;">副标题说明</p>', fontSize: 24, fontFamily: 'Microsoft YaHei', color: '#666666' }],
+            bullets: [{ type: 'text', x: 100, y: 100, width: 700, content: '<h2>项目要点</h2><ul><li>要点1：主要内容说明</li><li>要点2：主要内容说明</li><li>要点3：主要内容说明</li></ul>', fontSize: 20, fontFamily: 'Microsoft YaHei', color: '#000000' }],
+            twoCol: [{ type: 'text', x: 50, y: 100, width: 400, content: '<h2>左侧内容</h2><p>说明文字</p>', fontSize: 24, fontFamily: 'Microsoft YaHei', color: '#c43e1c' },
+                      { type: 'text', x: 500, y: 100, width: 400, content: '<h2>右侧内容</h2><p>说明文字</p>', fontSize: 24, fontFamily: 'Microsoft YaHei', color: '#c43e1c' }],
+            quote: [{ type: 'text', x: 100, y: 200, width: 700, content: '<p style="font-size:32px;font-style:italic;">“人生就像一场演讲”</p><p style="text-align:right;">—— 名言引用</p>', fontSize: 28, fontFamily: 'KaiTi', color: '#555555' }],
+            thanks: [{ type: 'text', x: 150, y: 250, width: 600, content: '<h1 style="text-align:center;">感谢观看</h1><p style="text-align:center;">Q & A</p>', fontSize: 28, fontFamily: 'Microsoft YaHei', color: '#c43e1c' }]
+        };
+        let elements = templates[type] || templates.blank;
+        slides[currentIndex].elements = JSON.parse(JSON.stringify(elements));
+        selectedElement = null;
+        selectedElementIdx = -1;
+        renderSlide();
+        renderSidebar();
+        closeTemplateModal();
+    }
+    
+    function openTemplateModal() { document.getElementById('templateModal').style.display = 'flex'; }
+    function closeTemplateModal() { document.getElementById('templateModal').style.display = 'none'; }
+    
+    function saveAsPPTX() { 
+        let pres = new PptxGenJS(); 
+        slides.forEach(slide => { 
+            let pptSlide = pres.addSlide(); 
+            let textContent = ''; 
+            slide.elements.forEach(el => { 
+                if (el.type === 'text') textContent += el.content.replace(/<[^>]*>/g, ' ') + ' '; 
+            }); 
+            pptSlide.addText(textContent.substring(0, 500), { x: 0.5, y: 0.5, w: 9, h: 5, fontSize: 18 }); 
+        }); 
+        pres.writeFile({ fileName: '演示文稿.pptx' }); 
+    }
+    
+    function fullscreenPlay() { 
+        let win = window.open('', '_blank', 'width=1200,height=700'); 
+        let content = `<!DOCTYPE html><html><head><title>PPT 全屏演示</title><style>*{margin:0;padding:0;} body{background:#000;display:flex;flex-direction:column;height:100vh;} .slide-area{flex:1;display:flex;justify-content:center;align-items:center;background:#1a1a1a;} .slide-card{background:white;width:1000px;min-height:600px;padding:50px;box-shadow:0 0 20px rgba(0,0,0,0.5);position:relative;} .controls{background:#333;color:white;padding:12px;text-align:center;} button{background:#c43e1c;border:none;color:white;padding:8px 20px;border-radius:6px;cursor:pointer;margin:0 10px;} .page-num{color:white;}</style></head><body><div class="slide-area"><div class="slide-card" id="slideContent"></div></div><div class="controls"><button onclick="prev()">◀ 上一页</button><span class="page-num" id="pageNum">1 / ${slides.length}</span><button onclick="next()">下一页 ▶</button><button onclick="window.close()">退出 ESC</button></div><script>let slidesData = ${JSON.stringify(slides.map(s => s.elements))}; let idx = 0; function renderSlide(){ let container=document.getElementById('slideContent'); container.innerHTML=''; slidesData[idx].forEach(el=>{ let div=document.createElement('div'); div.style.position='absolute'; div.style.left=el.x+'px'; div.style.top=el.y+'px'; if(el.type==='text'){ div.innerHTML=el.content; div.style.fontSize=el.fontSize+'px'; div.style.fontFamily=el.fontFamily; div.style.color=el.color; } container.appendChild(div); }); document.getElementById('pageNum').innerText=(idx+1)+' / ${slides.length}'; } function next(){ if(idx<slidesData.length-1){ idx++; renderSlide(); } } function prev(){ if(idx>0){ idx--; renderSlide(); } } document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight') next(); if(e.key==='ArrowLeft') prev(); if(e.key==='Escape') window.close(); }); renderSlide();<\/script></body></html>`; 
+        win.document.write(content); 
+        win.document.close(); 
+    }
+    
+    initDefault();
+    renderSlide();
+    renderSidebar();
+</script>
+</body>
+</html>

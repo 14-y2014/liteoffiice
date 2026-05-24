@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; }
+        body { margin: 0; background: #e9ecef; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .toolbar { background: #21a366; color: white; padding: 8px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .tool-btn { background: #2b8c4a; border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .tool-btn:hover { background: #1e6f3f; }
+        .tool-btn.primary { background: #107c3e; }
+        .tool-btn.warning { background: #e67e22; }
+        .tool-btn.warning:hover { background: #d35400; }
+        .tool-btn.danger { background: #dc3545; }
+        .tool-btn.danger:hover { background: #c82333; }
+        .formula-bar { background: white; padding: 6px 12px; border-bottom: 1px solid #ccc; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .formula-label { background: #f0f0f0; padding: 4px 12px; border-radius: 4px; font-weight: bold; font-family: monospace; }
+        #formulaInput { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 14px; }
+        .formula-preview {
+            background: #f9f9f9;
+            padding: 4px 12px;
+            font-size: 12px;
+            color: #666;
+            border-left: 2px solid #21a366;
+            font-family: monospace;
+        }
+        .sheet-container { flex: 1; overflow: auto; background: white; }
+        #excelGrid { border-collapse: collapse; width: 100%; }
+        #excelGrid th, #excelGrid td { border: 1px solid #ccc; padding: 8px 10px; min-width: 90px; font-size: 13px; height: 36px; }
+        #excelGrid th { background: #f1f3f5; position: sticky; top: 0; font-weight: 600; }
+        #excelGrid td { background: white; cursor: pointer; }
+        #excelGrid td:focus {
+            background: #e8f5e9;
+            outline: 3px solid #21a366;
+            outline-offset: -1px;
+        }
+        #excelGrid td.selected {
+            background: #d4edda;
+            outline: 3px solid #21a366;
+            outline-offset: -1px;
+        }
+        #excelGrid td.merged { background: #fff3e0; position: relative; }
+        #excelGrid td.merged::after { content: "🔗"; position: absolute; bottom: 2px; right: 4px; font-size: 10px; opacity: 0.6; }
+        .status { background: #f8f9fa; padding: 4px 12px; font-size: 12px; border-top: 1px solid #ddd; display: flex; gap: 20px; justify-content: space-between; }
+        .status-left { display: flex; gap: 20px; }
+        .sheet-tabs { background: #f1f3f5; border-top: 1px solid #ddd; display: flex; padding: 0 8px; gap: 2px; overflow-x: auto; }
+        .sheet-tab { padding: 8px 20px; background: #e9ecef; border: none; cursor: pointer; font-size: 13px; border-radius: 8px 8px 0 0; transition: 0.2s; }
+        .sheet-tab:hover { background: #dee2e6; }
+        .sheet-tab.active { background: white; font-weight: bold; color: #21a366; border-bottom: 2px solid #21a366; }
+        .sheet-tab .close { margin-left: 8px; color: #999; cursor: pointer; }
+        .sheet-tab .close:hover { color: #dc3545; }
+        .add-sheet-btn { background: #dee2e6; border: none; padding: 8px 16px; cursor: pointer; border-radius: 8px 8px 0 0; margin-left: 4px; }
+        .add-sheet-btn:hover { background: #ced4da; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; border-radius: 8px; width: 500px; max-width: 90%; max-height: 80vh; overflow: auto; }
+        .modal-header { background: #21a366; color: white; padding: 12px 15px; border-radius: 8px 8px 0 0; }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 12px 15px; background: #f8f9fa; text-align: right; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #21a366; color: white; }
+        .btn-secondary { background: #6c757d; color: white; margin-right: 8px; }
+        .template-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .template-card { padding: 15px; background: #f8f9fa; border-radius: 8px; cursor: pointer; text-align: center; }
+        .template-card:hover { background: #e9ecef; }
+        .template-icon { font-size: 40px; margin-bottom: 10px; }
+        .selection-info { background: #e9ecef; padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+    </style>
+</head>
+<body>
+<div class="toolbar">
+    <span style="font-weight:bold;">📊 Excel</span>
+    <button class="tool-btn" onclick="openFile()">📂 打开</button>
+    <button class="tool-btn" onclick="saveFile()">💾 保存</button>
+    <button class="tool-btn primary" onclick="openTemplate()">🎨 模板库</button>
+    <button class="tool-btn" onclick="addRow()">➕ 添加行</button>
+    <button class="tool-btn" onclick="addCol()">➕ 添加列</button>
+    <button class="tool-btn warning" onclick="mergeSelected()">🔗 合并单元格</button>
+    <button class="tool-btn" onclick="clearAll()">🗑️ 清空当前表格</button>
+</div>
+<div class="formula-bar">
+    <span class="formula-label">fx</span>
+    <input type="text" id="formulaInput" placeholder="输入公式，如 =SUM(A1:A5) 或 =(A1+B1)*C1">
+    <button class="tool-btn" onclick="applyFormula()">✓ 应用</button>
+    <div class="formula-preview" id="formulaPreview"></div>
+</div>
+<div class="sheet-container">
+    <table id="excelGrid"></td>
+</div>
+<div class="sheet-tabs" id="sheetTabs">
+</div>
+<div class="status">
+    <div class="status-left">
+        <span>📌 单击选中单元格编辑</span>
+        <span id="selectionInfo" class="selection-info">⚡ Ctrl多选后合并</span>
+    </div>
+</div>
+
+<div id="templateModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><h3>🎨 选择模板</h3></div>
+        <div class="modal-body">
+            <div class="template-grid">
+                <div class="template-card" onclick="loadTemplate('blank')"><div class="template-icon">📄</div><div>空白表格</div></div>
+                <div class="template-card" onclick="loadTemplate('budget')"><div class="template-icon">💰</div><div>家庭预算</div></div>
+                <div class="template-card" onclick="loadTemplate('sales')"><div class="template-icon">📈</div><div>销售统计</div></div>
+                <div class="template-card" onclick="loadTemplate('grade')"><div class="template-icon">🎓</div><div>成绩单</div></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">关闭</button></div>
+    </div>
+</div>
+
+<script>
+    let sheets = {};
+    let sheetOrder = [];
+    let activeSheet = '';
+    
+    const DEFAULT_ROWS = 30;
+    const DEFAULT_COLS = 12;
+    
+    function createEmptySheet(name, rows = DEFAULT_ROWS, cols = DEFAULT_COLS) {
+        let data = [];
+        for(let i = 0; i < rows; i++) {
+            data[i] = [];
+            for(let j = 0; j < cols; j++) {
+                data[i][j] = '';
+            }
+        }
+        return {
+            name: name,
+            rows: rows,
+            cols: cols,
+            data: data,
+            merges: [],
+            selected: []
+        };
+    }
+    
+    function initSheets() {
+        let sheet1 = createEmptySheet('Sheet1');
+        sheetOrder = ['Sheet1'];
+        sheets = {
+            'Sheet1': sheet1
+        };
+        activeSheet = 'Sheet1';
+    }
+    initSheets();
+    
+    let isCtrlPressed = false;
+    let pendingBlur = null;
+    
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Control') {
+            isCtrlPressed = true;
+            if (pendingBlur) {
+                clearTimeout(pendingBlur);
+                pendingBlur = null;
+            }
+        }
+    });
+    
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'Control') {
+            isCtrlPressed = false;
+        }
+    });
+    
+    function getCurrentSheet() {
+        return sheets[activeSheet];
+    }
+    
+    function colLetter(n) {
+        let letter = '';
+        while(n >= 0) {
+            letter = String.fromCharCode(65 + (n % 26)) + letter;
+            n = Math.floor(n / 26) - 1;
+        }
+        return letter;
+    }
+    
+    function colToIndex(letters) {
+        let idx = 0;
+        for(let i = 0; i < letters.length; i++) {
+            idx = idx * 26 + (letters.charCodeAt(i) - 64);
+        }
+        return idx - 1;
+    }
+    
+    function getRawNumber(row, col) {
+        let sheet = getCurrentSheet();
+        for(let m of sheet.merges) {
+            if(row >= m.r1 && row <= m.r2 && col >= m.c1 && col <= m.c2) {
+                let n = parseFloat(m.value);
+                return isNaN(n) ? 0 : n;
+            }
+        }
+        let v = sheet.data[row]?.[col];
+        if(typeof v === 'string' && v.startsWith('=')) {
+            v = evalFormula(v, row, col);
+        }
+        let n = parseFloat(v);
+        return isNaN(n) ? 0 : n;
+    }
+    
+    function evalFormula(formula, row, col) {
+        try {
+            let expr = formula.substring(1).toUpperCase();
+            
+            let sumPattern = /SUM\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)/g;
+            expr = expr.replace(sumPattern, (match, c1, r1, c2, r2) => {
+                let cc1 = colToIndex(c1), cc2 = colToIndex(c2);
+                let rr1 = parseInt(r1)-1, rr2 = parseInt(r2)-1;
+                let total = 0;
+                for(let r = rr1; r <= rr2; r++) {
+                    for(let c = cc1; c <= cc2; c++) {
+                        total += getRawNumber(r, c);
+                    }
+                }
+                return total;
+            });
+            
+            let cellPattern = /([A-Z]+)(\d+)/g;
+            expr = expr.replace(cellPattern, (match, letters, num) => {
+                let c = colToIndex(letters);
+                let r = parseInt(num) - 1;
+                let val = getRawNumber(r, c);
+                return val;
+            });
+            
+            let result = Function('"use strict";return (' + expr + ')')();
+            return isNaN(result) ? '#VALUE!' : Math.round(result * 100000) / 100000;
+        } catch(e) {
+            return '#ERROR!';
+        }
+    }
+    
+    function getValue(row, col) {
+        let sheet = getCurrentSheet();
+        for(let m of sheet.merges) {
+            if(row >= m.r1 && row <= m.r2 && col >= m.c1 && col <= m.c2) {
+                if(row === m.r1 && col === m.c1) return m.value;
+                return '';
+            }
+        }
+        let v = sheet.data[row]?.[col];
+        if(typeof v === 'string' && v.startsWith('=')) {
+            return evalFormula(v, row, col);
+        }
+        return v !== undefined ? v : '';
+    }
+    
+    function saveCell(row, col, value) {
+        let sheet = getCurrentSheet();
+        let merged = sheet.merges.find(m => row >= m.r1 && row <= m.r2 && col >= m.c1 && col <= m.c2);
+        if(merged) {
+            merged.value = value;
+        } else {
+            sheet.data[row][col] = value;
+        }
+        render();
+    }
+    
+    function render() {
+        let sheet = getCurrentSheet();
+        let table = document.getElementById('excelGrid');
+        table.innerHTML = '';
+        
+        let thead = document.createElement('thead');
+        let tr = document.createElement('tr');
+        let th = document.createElement('th');
+        th.style.background = '#e9ecef';
+        th.style.width = '40px';
+        tr.appendChild(th);
+        for(let c = 0; c < sheet.cols; c++) {
+            th = document.createElement('th');
+            th.innerText = colLetter(c);
+            tr.appendChild(th);
+        }
+        thead.appendChild(tr);
+        table.appendChild(thead);
+        
+        let tbody = document.createElement('tbody');
+        for(let r = 0; r < sheet.rows; r++) {
+            tr = document.createElement('tr');
+            th = document.createElement('th');
+            th.style.background = '#e9ecef';
+            th.innerText = r + 1;
+            tr.appendChild(th);
+            
+            for(let c = 0; c < sheet.cols; c++) {
+                let td = document.createElement('td');
+                let isHidden = false;
+                let mergedInfo = null;
+                
+                for(let m of sheet.merges) {
+                    if(r >= m.r1 && r <= m.r2 && c >= m.c1 && c <= m.c2) {
+                        if(r !== m.r1 || c !== m.c1) {
+                            isHidden = true;
+                        } else {
+                            mergedInfo = m;
+                        }
+                        break;
+                    }
+                }
+                
+                if(mergedInfo) {
+                    td.classList.add('merged');
+                    if(mergedInfo.r2 > mergedInfo.r1) td.setAttribute('rowspan', mergedInfo.r2 - mergedInfo.r1 + 1);
+                    if(mergedInfo.c2 > mergedInfo.c1) td.setAttribute('colspan', mergedInfo.c2 - mergedInfo.c1 + 1);
+                    td.innerText = mergedInfo.value || '';
+                } else if(!isHidden) {
+                    let val = sheet.data[r][c];
+                    if(typeof val === 'string' && val.startsWith('=')) {
+                        td.innerText = evalFormula(val, r, c);
+                    } else {
+                        td.innerText = val;
+                    }
+                }
+                
+                if(isHidden) {
+                    td.style.display = 'none';
+                }
+                
+                td.setAttribute('data-row', r);
+                td.setAttribute('data-col', c);
+                td.setAttribute('contenteditable', 'true');
+                
+                if(sheet.selected.some(s => s.row === r && s.col === c)) {
+                    td.classList.add('selected');
+                }
+                
+                td.onfocus = (function(row, col) {
+                    return function() {
+                        if (pendingBlur) {
+                            clearTimeout(pendingBlur);
+                            pendingBlur = null;
+                        }
+                        let val = getCurrentSheet().data[row][col];
+                        document.getElementById('formulaInput').value = val;
+                        let result = getValue(row, col);
+                        document.getElementById('formulaPreview').innerHTML = '📊 结果: ' + result;
+                    };
+                })(r, c);
+                
+                td.onblur = (function(row, col) {
+                    return function(e) {
+                        if (isCtrlPressed) {
+                            pendingBlur = setTimeout(() => {
+                                if (!isCtrlPressed) {
+                                    let value = e.target.innerText;
+                                    saveCell(row, col, value);
+                                    render();
+                                }
+                                pendingBlur = null;
+                            }, 300);
+                            return;
+                        }
+                        let value = e.target.innerText;
+                        saveCell(row, col, value);
+                        render();
+                    };
+                })(r, c);
+                
+                td.onclick = (function(row, col) {
+                    return function(e) {
+                        let sheet = getCurrentSheet();
+                        if (pendingBlur) {
+                            clearTimeout(pendingBlur);
+                            pendingBlur = null;
+                        }
+                        
+                        if(e.ctrlKey) {
+                            e.preventDefault();
+                            let idx = sheet.selected.findIndex(s => s.row === row && s.col === col);
+                            if(idx === -1) {
+                                sheet.selected.push({row, col});
+                            } else {
+                                sheet.selected.splice(idx, 1);
+                            }
+                            render();
+                            setTimeout(() => {
+                                let td = document.querySelector(`#excelGrid td[data-row="${row}"][data-col="${col}"]`);
+                                if(td) td.focus();
+                            }, 10);
+                        } else if(e.shiftKey && sheet.selected.length > 0) {
+                            let first = sheet.selected[0];
+                            let r1 = Math.min(first.row, row);
+                            let r2 = Math.max(first.row, row);
+                            let c1 = Math.min(first.col, col);
+                            let c2 = Math.max(first.col, col);
+                            sheet.selected = [];
+                            for(let r = r1; r <= r2; r++) {
+                                for(let c = c1; c <= c2; c++) {
+                                    sheet.selected.push({row: r, col: c});
+                                }
+                            }
+                            render();
+                        } else {
+                            sheet.selected = [{row, col}];
+                            render();
+                            setTimeout(() => {
+                                let newTd = document.querySelector(`#excelGrid td[data-row="${row}"][data-col="${col}"]`);
+                                if(newTd) newTd.focus();
+                            }, 10);
+                        }
+                        updateInfo();
+                        e.stopPropagation();
+                    };
+                })(r, c);
+                
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        updateInfo();
+        renderSheetTabs();
+    }
+    
+    function updateInfo() {
+        let sheet = getCurrentSheet();
+        let info = document.getElementById('selectionInfo');
+        if(sheet.selected.length > 1) {
+            info.innerHTML = '✅ 已选中 ' + sheet.selected.length + ' 个单元格，点击合并';
+        } else {
+            info.innerHTML = '⚡ Ctrl多选单元格后合并';
+        }
+    }
+    
+    function mergeSelected() {
+        let sheet = getCurrentSheet();
+        if(sheet.selected.length < 2) {
+            alert('请按住Ctrl键选择至少2个单元格');
+            return;
+        }
+        
+        let rows = sheet.selected.map(s => s.row);
+        let cols = sheet.selected.map(s => s.col);
+        let r1 = Math.min(...rows);
+        let r2 = Math.max(...rows);
+        let c1 = Math.min(...cols);
+        let c2 = Math.max(...cols);
+        
+        let expected = (r2 - r1 + 1) * (c2 - c1 + 1);
+        if(sheet.selected.length !== expected) {
+            alert('请选择连续的矩形区域');
+            return;
+        }
+        
+        let topLeft = getValue(r1, c1);
+        
+        sheet.merges = sheet.merges.filter(m => {
+            return !(m.r1 >= r1 && m.r2 <= r2 && m.c1 >= c1 && m.c2 <= c2);
+        });
+        
+        sheet.merges.push({
+            r1: r1, c1: c1,
+            r2: r2, c2: c2,
+            value: topLeft
+        });
+        
+        for(let r = r1; r <= r2; r++) {
+            for(let c = c1; c <= c2; c++) {
+                if(r !== r1 || c !== c1) {
+                    sheet.data[r][c] = '';
+                }
+            }
+        }
+        
+        sheet.selected = [{row: r1, col: c1}];
+        render();
+        alert('合并成功！');
+    }
+    
+    function applyFormula() {
+        let formula = document.getElementById('formulaInput').value;
+        let sheet = getCurrentSheet();
+        if(!formula) return;
+        if(sheet.selected.length === 1) {
+            let s = sheet.selected[0];
+            saveCell(s.row, s.col, formula);
+            render();
+            setTimeout(() => {
+                let td = document.querySelector(`#excelGrid td[data-row="${s.row}"][data-col="${s.col}"]`);
+                if(td) td.focus();
+            }, 10);
+        } else {
+            alert('请先选中一个单元格');
+        }
+        document.getElementById('formulaInput').value = '';
+        document.getElementById('formulaPreview').innerHTML = '';
+    }
+    
+    function loadTemplate(type) {
+        let sheet = getCurrentSheet();
+        if(type === 'blank') {
+            for(let i = 0; i < sheet.rows; i++) {
+                for(let j = 0; j < sheet.cols; j++) {
+                    sheet.data[i][j] = '';
+                }
+            }
+            sheet.merges = [];
+        } else if(type === 'budget') {
+            sheet.data[0] = ['项目', '预算', '实际', '差额'];
+            sheet.data[1] = ['房租', '3000', '', '=B2-C2'];
+            sheet.data[2] = ['餐饮', '1500', '', '=B3-C3'];
+            sheet.data[3] = ['交通', '500', '', '=B4-C4'];
+            sheet.data[4] = ['娱乐', '800', '', '=B5-C5'];
+            sheet.data[5] = ['合计', '=SUM(B2:B5)', '=SUM(C2:C5)', '=B6-C6'];
+        } else if(type === 'sales') {
+            sheet.data[0] = ['月份', '销售额', '成本', '利润'];
+            sheet.data[1] = ['1月', '50000', '30000', '=B2-C2'];
+            sheet.data[2] = ['2月', '60000', '35000', '=B3-C3'];
+            sheet.data[3] = ['3月', '55000', '32000', '=B4-C4'];
+            sheet.data[4] = ['合计', '=SUM(B2:B4)', '=SUM(C2:C4)', '=B5-C5'];
+        } else if(type === 'grade') {
+            sheet.data[0] = ['姓名', '语文', '数学', '英语', '总分', '平均分'];
+            sheet.data[1] = ['张三', '85', '92', '88', '=SUM(B2:D2)', '=E2/3'];
+            sheet.data[2] = ['李四', '78', '88', '95', '=SUM(B3:D3)', '=E3/3'];
+            sheet.data[3] = ['王五', '92', '85', '90', '=SUM(B4:D4)', '=E4/3'];
+            sheet.data[4] = ['最高分', '=MAX(B2:B4)', '=MAX(C2:C4)', '=MAX(D2:D4)', '', ''];
+        }
+        render();
+        closeModal();
+    }
+    
+    function addSheet() {
+        let newName = `Sheet${sheetOrder.length + 1}`;
+        let counter = 2;
+        while(sheets[newName]) {
+            newName = `Sheet${counter++}`;
+        }
+        sheets[newName] = createEmptySheet(newName);
+        sheetOrder.push(newName);
+        activeSheet = newName;
+        renderSheetTabs();
+        render();
+    }
+    
+    function switchSheet(sheetName) {
+        activeSheet = sheetName;
+        render();
+    }
+    
+    function deleteSheet(sheetName, event) {
+        event.stopPropagation();
+        if(sheetOrder.length === 1) {
+            alert('至少保留一个表格！');
+            return;
+        }
+        if(confirm(`确定删除表格 "${sheetName}" 吗？`)) {
+            delete sheets[sheetName];
+            let index = sheetOrder.indexOf(sheetName);
+            sheetOrder.splice(index, 1);
+            if(activeSheet === sheetName) {
+                activeSheet = sheetOrder[0];
+            }
+            renderSheetTabs();
+            render();
+        }
+    }
+    
+    function renderSheetTabs() {
+        let container = document.getElementById('sheetTabs');
+        container.innerHTML = '';
+        for(let name of sheetOrder) {
+            let tab = document.createElement('button');
+            tab.className = 'sheet-tab';
+            if(name === activeSheet) tab.classList.add('active');
+            tab.innerHTML = `${name} <span class="close" onclick="deleteSheet('${name}', event)">✕</span>`;
+            tab.onclick = () => switchSheet(name);
+            container.appendChild(tab);
+        }
+        let addBtn = document.createElement('button');
+        addBtn.className = 'add-sheet-btn';
+        addBtn.innerHTML = '+';
+        addBtn.onclick = () => addSheet();
+        container.appendChild(addBtn);
+    }
+    
+    function openTemplate() { document.getElementById('templateModal').style.display = 'flex'; }
+    function closeModal() { document.getElementById('templateModal').style.display = 'none'; }
+    
+    function openFile() {
+        let input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.xlsx,.xls';
+        input.onchange = function(e) {
+            let file = e.target.files[0];
+            let reader = new FileReader();
+            reader.onload = function(ev) {
+                let dataArr = new Uint8Array(ev.target.result);
+                let workbook = XLSX.read(dataArr, {type: 'array'});
+                
+                sheets = {};
+                sheetOrder = [];
+                
+                for(let sheetName of workbook.SheetNames) {
+                    let sheet = workbook.Sheets[sheetName];
+                    let json = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ''});
+                    let rows = Math.max(json.length, DEFAULT_ROWS);
+                    let cols = 0;
+                    for(let row of json) {
+                        cols = Math.max(cols, row.length);
+                    }
+                    cols = Math.max(cols, DEFAULT_COLS);
+                    
+                    let newSheet = createEmptySheet(sheetName, rows, cols);
+                    for(let i = 0; i < json.length; i++) {
+                        for(let j = 0; j < json[i].length; j++) {
+                            if(json[i][j] !== undefined && json[i][j] !== null) {
+                                newSheet.data[i][j] = String(json[i][j]);
+                            }
+                        }
+                    }
+                    sheets[sheetName] = newSheet;
+                    sheetOrder.push(sheetName);
+                }
+                
+                if(sheetOrder.length === 0) {
+                    initSheets();
+                }
+                activeSheet = sheetOrder[0];
+                render();
+            };
+            reader.readAsArrayBuffer(file);
+        };
+        input.click();
+    }
+    
+    function saveFile() {
+        let workbook = XLSX.utils.book_new();
+        for(let sheetName of sheetOrder) {
+            let sheet = sheets[sheetName];
+            let sheetData = [];
+            for(let r = 0; r < sheet.rows; r++) {
+                let row = [];
+                for(let c = 0; c < sheet.cols; c++) {
+                    let merged = sheet.merges.find(m => r >= m.r1 && r <= m.r2 && c >= m.c1 && c <= m.c2);
+                    if(merged && (r !== merged.r1 || c !== merged.c1)) continue;
+                    if(merged) {
+                        row.push(merged.value);
+                    } else {
+                        row.push(sheet.data[r][c]);
+                    }
+                }
+                if(row.some(cell => cell !== '' && cell !== undefined)) {
+                    sheetData.push(row);
+                }
+            }
+            let ws = XLSX.utils.aoa_to_sheet(sheetData);
+            XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+        }
+        XLSX.writeFile(workbook, '表格.xlsx');
+    }
+    
+    function addRow() {
+        let sheet = getCurrentSheet();
+        sheet.data.push(Array(sheet.cols).fill(''));
+        sheet.rows++;
+        render();
+    }
+    
+    function addCol() {
+        let sheet = getCurrentSheet();
+        for(let r = 0; r < sheet.data.length; r++) {
+            sheet.data[r].push('');
+        }
+        sheet.cols++;
+        render();
+    }
+    
+    function clearAll() {
+        if(confirm('清空当前表格所有数据？')) {
+            let sheet = getCurrentSheet();
+            for(let i = 0; i < sheet.rows; i++) {
+                for(let j = 0; j < sheet.cols; j++) {
+                    sheet.data[i][j] = '';
+                }
+            }
+            sheet.merges = [];
+            render();
+        }
+    }
+    
+    document.getElementById('formulaInput').addEventListener('input', function() {
+        let formula = this.value;
+        let preview = document.getElementById('formulaPreview');
+        if(formula && formula.startsWith('=') && getCurrentSheet().selected.length === 1) {
+            let s = getCurrentSheet().selected[0];
+            try {
+                let result = evalFormula(formula, s.row, s.col);
+                preview.innerHTML = '📊 预览: ' + result;
+            } catch(e) {
+                preview.innerHTML = '⚠️ 公式错误';
+            }
+        } else if(formula && !formula.startsWith('=')) {
+            preview.innerHTML = '💡 公式应以 = 开头，如 =A1+B1';
+        } else {
+            preview.innerHTML = '';
+        }
+    });
+    
+    renderSheetTabs();
+    render();
+</script>
+</body>
+</html>

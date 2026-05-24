@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word</title>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.4.2/mammoth.browser.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; }
+        body { background: #f5f5f5; min-height: 100vh; }
+        .word-editor { display: flex; flex-direction: column; height: 100vh; background: white; }
+        .title-bar { background: #185abd; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .title-left { display: flex; align-items: center; gap: 15px; }
+        .logo { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: bold; }
+        .document-title { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; font-size: 16px; padding: 6px 12px; border-radius: 4px; width: 200px; }
+        .save-status { font-size: 12px; }
+        .save-status.unsaved { color: #ffaa00; }
+        .toolbar { background: #f8f9fa; padding: 8px 15px; border-bottom: 1px solid #dee2e6; display: flex; flex-wrap: wrap; gap: 5px; }
+        .tool-group { display: flex; padding-right: 15px; margin-right: 15px; border-right: 1px solid #dee2e6; flex-wrap: wrap; gap: 3px; }
+        .tool-group:last-child { border-right: none; }
+        .tool-btn { background: white; border: 1px solid #ced4da; padding: 6px 10px; cursor: pointer; border-radius: 4px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
+        .tool-btn:hover { background: #e9ecef; }
+        .tool-btn.primary { background: #185abd; color: white; border-color: #185abd; }
+        .tool-btn.primary:hover { background: #0e3e7c; }
+        select, .color-picker { padding: 5px 8px; border: 1px solid #ced4da; border-radius: 4px; background: white; cursor: pointer; }
+        .color-picker { width: 36px; height: 32px; }
+        .editor-container { flex: 1; display: flex; overflow: hidden; }
+        .document-pane { flex: 1; padding: 20px; overflow-y: auto; background: #e9ecef; }
+        .page { background: white; min-height: 100%; padding: 60px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        #editorContent { outline: none; min-height: 500px; line-height: 1.6; font-size: 16px; }
+        #editorContent h1 { font-size: 28px; margin: 20px 0 10px; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        #editorContent h2 { font-size: 22px; margin: 15px 0 8px; color: #2c3e50; }
+        #editorContent p { margin: 10px 0; }
+        #editorContent ul, #editorContent ol { margin: 10px 0 10px 25px; }
+        #editorContent table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+        #editorContent th, #editorContent td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        #editorContent th { background: #f8f9fa; }
+        .status-bar { background: #2c3e50; color: #ecf0f1; padding: 5px 15px; display: flex; justify-content: space-between; font-size: 12px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; border-radius: 8px; width: 500px; max-width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-header { background: #185abd; color: white; padding: 12px 15px; border-radius: 8px 8px 0 0; }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 12px 15px; background: #f8f9fa; text-align: right; border-top: 1px solid #dee2e6; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #185abd; color: white; }
+        .btn-secondary { background: #6c757d; color: white; margin-right: 8px; }
+        .template-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .template-card { padding: 15px; background: #f8f9fa; border-radius: 8px; cursor: pointer; text-align: center; transition: 0.2s; }
+        .template-card:hover { background: #e9ecef; transform: translateY(-2px); }
+        .template-icon { font-size: 40px; margin-bottom: 10px; }
+        input[type="text"], input[type="url"] { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; margin: 8px 0; }
+        @media (max-width: 768px) { .tool-btn span { display: none; } .page { padding: 20px; } .template-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="word-editor">
+    <div class="title-bar">
+        <div class="title-left">
+            <div class="logo">📝 Word</div>
+            <input type="text" class="document-title" id="docTitle" value="新文档">
+        </div>
+        <div class="save-status" id="saveStatus">✓ 已保存</div>
+    </div>
+    <div class="toolbar">
+        <div class="tool-group"><button class="tool-btn" onclick="newDocument()">📄 新建</button><button class="tool-btn" onclick="openDOCX()">📂 打开</button><button class="tool-btn" onclick="saveAsDOCX()">💾 保存</button><button class="tool-btn primary" onclick="openTemplateModal()">🎨 模板库</button></div>
+        <div class="tool-group"><select id="fontFamily" onchange="formatText('fontName', this.value)"><option value="Microsoft YaHei">微软雅黑</option><option value="SimSun">宋体</option><option value="SimHei">黑体</option><option value="KaiTi">楷体</option><option value="Arial">Arial</option></select><select id="fontSize" onchange="formatText('fontSize', this.value)"><option value="1">小</option><option value="2">较小</option><option value="3" selected>标准</option><option value="4">中</option><option value="5">大</option></select></div>
+        <div class="tool-group"><button class="tool-btn" onclick="formatText('bold')"><b>B</b></button><button class="tool-btn" onclick="formatText('italic')"><i>I</i></button><button class="tool-btn" onclick="formatText('underline')"><u>U</u></button></div>
+        <div class="tool-group"><button class="tool-btn" onclick="formatText('justifyLeft')">左对齐</button><button class="tool-btn" onclick="formatText('justifyCenter')">居中</button><button class="tool-btn" onclick="formatText('justifyRight')">右对齐</button></div>
+        <div class="tool-group"><input type="color" class="color-picker" id="textColor" onchange="formatText('foreColor', this.value)" value="#000000"></div>
+        <div class="tool-group"><button class="tool-btn" onclick="insertTable()">📊 表格</button><button class="tool-btn" onclick="insertImage()">🖼️ 图片</button><button class="tool-btn" onclick="insertList()">• 列表</button></div>
+    </div>
+    <div class="editor-container"><div class="document-pane"><div class="page"><div id="editorContent" contenteditable="true"></div></div></div></div>
+    <div class="status-bar"><div>📝 字数: <span id="wordCount">0</span></div><div></div></div>
+</div>
+
+<div class="modal" id="templateModal">
+    <div class="modal-content">
+        <div class="modal-header"><h3>🎨 选择模板</h3></div>
+        <div class="modal-body">
+            <div class="template-grid">
+                <div class="template-card" onclick="applyTemplate('blank')"><div class="template-icon">📄</div><div>空白文档</div></div>
+                <div class="template-card" onclick="applyTemplate('resume')"><div class="template-icon">📋</div><div>求职简历</div></div>
+                <div class="template-card" onclick="applyTemplate('report')"><div class="template-icon">📊</div><div>工作报告</div></div>
+                <div class="template-card" onclick="applyTemplate('letter')"><div class="template-icon">✉️</div><div>商务信函</div></div>
+                <div class="template-card" onclick="applyTemplate('essay')"><div class="template-icon">📝</div><div>学术论文</div></div>
+                <div class="template-card" onclick="applyTemplate('meeting')"><div class="template-icon">📅</div><div>会议纪要</div></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeTemplateModal()">关闭</button></div>
+    </div>
+</div>
+
+<script>
+    let hasUnsavedChanges = false;
+    
+    function updateWordCount() {
+        let editor = document.getElementById('editorContent');
+        let text = editor.innerText || editor.textContent || '';
+        
+        let chineseCount = (text.match(/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/g) || []).length;
+        
+        let englishText = text.replace(/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/g, ' ');
+        let englishWords = englishText.match(/[a-zA-Z0-9]+/g) || [];
+        let englishCount = englishWords.length;
+        
+        let total = chineseCount + englishCount;
+        
+        document.getElementById('wordCount').innerText = total;
+    }
+    
+    function formatText(cmd, val) { document.execCommand(cmd, false, val || null); markUnsaved(); updateWordCount(); }
+    function insertTable() { let r=prompt('行数:','3'), c=prompt('列数:','3'); if(r&&c){ let html='<table border="1" style="border-collapse:collapse;width:100%">'; for(let i=0;i<r;i++){ html+='<tr>'; for(let j=0;j<c;j++) html+='<td style="padding:5px">&nbsp;</td>'; html+='</tr>'; } html+='</table>'; document.execCommand('insertHTML',false,html); markUnsaved(); updateWordCount(); } }
+    function insertImage() { let url=prompt('图片URL:','https://picsum.photos/400/200'); if(url) document.execCommand('insertHTML',false,`<img src="${url}" style="max-width:100%;margin:10px 0">`); markUnsaved(); updateWordCount(); }
+    function insertList() { document.execCommand('insertUnorderedList'); markUnsaved(); updateWordCount(); }
+    
+    function markUnsaved() { if(!hasUnsavedChanges){ hasUnsavedChanges=true; document.getElementById('saveStatus').innerHTML='⚠ 未保存'; document.getElementById('saveStatus').classList.add('unsaved'); } updateWordCount(); }
+    
+    function newDocument() { if(hasUnsavedChanges && !confirm('有未保存内容，确定新建？')) return; document.getElementById('docTitle').value='新文档'; document.getElementById('editorContent').innerHTML=''; hasUnsavedChanges=false; document.getElementById('saveStatus').innerHTML='✓ 已保存'; document.getElementById('saveStatus').classList.remove('unsaved'); updateWordCount(); }
+    
+    function applyTemplate(type) {
+        let templates = {
+            blank: '',
+            resume: '<h1 style="text-align:center;">个人简历</h1><hr><p><strong>姓名：</strong> ____________</p><p><strong>电话：</strong> ____________</p><p><strong>邮箱：</strong> ____________</p><h2>教育背景</h2><p>______年 - ______年 &nbsp;&nbsp; ______大学 &nbsp;&nbsp; ______专业</p><h2>工作经历</h2><p>______年 - ______年 &nbsp;&nbsp; ______公司 &nbsp;&nbsp; ______职位</p><h2>技能特长</h2><ul><li>技能1</li><li>技能2</li></ul>',
+            report: '<h1 style="text-align:center;">工作报告</h1><p style="text-align:center;">报告人：____________ &nbsp;&nbsp; 日期：____________</p><h2>一、工作概述</h2><p>本月主要完成以下工作内容...</p><h2>二、重点成果</h2><ul><li>成果1</li><li>成果2</li></ul><h2>三、下月计划</h2><p>计划开展以下工作...</p>',
+            letter: '<p style="text-align:right;">日期：____________</p><p><strong>收件人：</strong> ____________</p><p><strong>发件人：</strong> ____________</p><p>尊敬的____________：</p><p>&nbsp;&nbsp;&nbsp;&nbsp;您好！</p><p>&nbsp;&nbsp;&nbsp;&nbsp;兹有____________事宜，特此函告。</p><p style="text-align:right;">此致<br>敬礼</p><p style="text-align:right;">____________<br>____________年__月__日</p>',
+            essay: '<h1 style="text-align:center;">论文题目</h1><p style="text-align:center;"><strong>摘要</strong></p><p>本文主要研究...</p><p style="text-align:center;"><strong>关键词：</strong>关键词1；关键词2</p><h2>1. 引言</h2><p>研究背景与意义...</p><h2>2. 研究方法</h2><p>采用的方法...</p><h2>3. 结果分析</h2><p>研究结果...</p><h2>4. 结论</h2><p>研究结论...</p><p style="text-align:center;"><strong>参考文献</strong></p><p>[1] 作者. 文章标题. 期刊名, 年份.</p>',
+            meeting: '<h1 style="text-align:center;">会议纪要</h1><p><strong>会议时间：</strong> ____________</p><p><strong>会议地点：</strong> ____________</p><p><strong>主持人：</strong> ____________</p><p><strong>参会人员：</strong> ____________</p><h2>会议议题</h2><ol><li>议题1</li><li>议题2</li></ol><h2>会议内容</h2><p>会议讨论的主要内容...</p><h2>会议决议</h2><ul><li>决议1</li><li>决议2</li></ul><p><strong>下次会议：</strong> ____________</p>'
+        };
+        let content = templates[type] || '';
+        if(hasUnsavedChanges && !confirm('有未保存内容，应用模板将覆盖当前内容，确定？')) return;
+        document.getElementById('editorContent').innerHTML = content;
+        document.getElementById('docTitle').value = {blank:'新文档',resume:'简历',report:'工作报告',letter:'商务信函',essay:'学术论文',meeting:'会议纪要'}[type] || '新文档';
+        hasUnsavedChanges = false;
+        document.getElementById('saveStatus').innerHTML='✓ 已保存';
+        document.getElementById('saveStatus').classList.remove('unsaved');
+        updateWordCount();
+        closeTemplateModal();
+    }
+    
+    function openTemplateModal() { document.getElementById('templateModal').style.display = 'flex'; }
+    function closeTemplateModal() { document.getElementById('templateModal').style.display = 'none'; }
+    
+    function openDOCX() { let input=document.createElement('input'); input.type='file'; input.accept='.docx'; input.onchange=function(e){ let file=e.target.files[0]; let reader=new FileReader(); reader.onload=function(ev){ mammoth.convertToHtml({arrayBuffer:ev.target.result}).then(function(result){ document.getElementById('editorContent').innerHTML=result.value; document.getElementById('docTitle').value=file.name.replace(/\.docx$/i,''); hasUnsavedChanges=false; document.getElementById('saveStatus').innerHTML='✓ 已保存'; document.getElementById('saveStatus').classList.remove('unsaved'); updateWordCount(); }); }; reader.readAsArrayBuffer(file); }; input.click(); }
+    
+    function saveAsDOCX() { let title=document.getElementById('docTitle').value||'文档'; let content=document.getElementById('editorContent').innerHTML; let fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:'Microsoft YaHei';padding:40px;line-height:1.6} table{border-collapse:collapse;width:100%} th,td{border:1px solid #ddd;padding:8px}</style></head><body>${content}</body></html>`; let converted=htmlDocx.asBlob(fullHtml,{orientation:'portrait'}); saveAs(converted,`${title}.docx`); hasUnsavedChanges=false; document.getElementById('saveStatus').innerHTML='✓ 已保存'; document.getElementById('saveStatus').classList.remove('unsaved'); }
+    
+    document.getElementById('editorContent').addEventListener('input', markUnsaved);
+    document.addEventListener('keydown',e=>{ if(e.ctrlKey&&e.key==='s'){ e.preventDefault(); saveAsDOCX(); } if(e.ctrlKey&&e.key==='n'){ e.preventDefault(); newDocument(); } });
+    
+    updateWordCount();
+</script>
+</body>
+</html>
