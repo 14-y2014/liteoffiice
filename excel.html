@@ -634,28 +634,17 @@
     
     function saveFile() {
         let workbook = XLSX.utils.book_new();
-        for(let sheetName of sheetOrder) {
-            let sheet = sheets[sheetName];
-            let sheetData = [];
-            for(let r = 0; r < sheet.rows; r++) {
-                let row = [];
-                for(let c = 0; c < sheet.cols; c++) {
-                    let merged = sheet.merges.find(m => r >= m.r1 && r <= m.r2 && c >= m.c1 && c <= m.c2);
-                    if(merged && (r !== merged.r1 || c !== merged.c1)) continue;
-                    if(merged) {
-                        row.push(merged.value);
-                    } else {
-                        row.push(sheet.data[r][c]);
-                    }
-                }
-                if(row.some(cell => cell !== '' && cell !== undefined)) {
-                    sheetData.push(row);
-                }
+        let sheetData = [];
+        for(let r = 0; r < sheetRows; r++) {
+            let row = [];
+            for(let c = 0; c < sheetCols; c++) {
+                row.push(getCellValue(r, c));
             }
-            let ws = XLSX.utils.aoa_to_sheet(sheetData);
-            XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+            sheetData.push(row);
         }
-        XLSX.writeFile(workbook, '表格.xlsx');
+        let ws = XLSX.utils.aoa_to_sheet(sheetData);
+        XLSX.utils.book_append_sheet(workbook, ws, 'Sheet1');
+        XLSX.writeFile(workbook, `${currentFileName}.xlsx`);
     }
     
     function addRow() {
